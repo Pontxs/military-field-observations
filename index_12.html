@@ -1,0 +1,734 @@
+<!DOCTYPE html>
+<!--
+  ============================================================
+  SISTEMA DE FATOS OBSERVADOS — CAMPO BÁSICO
+  ============================================================
+  Tecnologias utilizadas:
+    - HTML5 / CSS3 / JavaScript (ES Modules)
+    - Firebase Firestore (banco de dados NoSQL em tempo real)
+    - Netlify (hospedagem estática)
+
+  Como configurar:
+    1. Crie um projeto no console.firebase.google.com
+    2. Ative o Firestore Database (modo de teste)
+    3. Registre um app Web e copie as credenciais
+    4. Substitua os valores em firebaseConfig abaixo
+    5. Hospede o arquivo (Netlify Drop, GitHub Pages, etc.)
+
+  Estrutura de dados (Firestore):
+    coleção: "fos"
+      documento: {
+        nome:       string  — nome de guerra do soldado
+        grupamento: string  — ex: "ALFA"
+        su:         string  — ex: "1ª Cia"
+        oficina:    string  — ex: "Orientação Diurna"
+        instrutor:  string  — ex: "Ten Lima"
+        tipo:       string  — "POS" ou "NEG"
+        semana:     string  — "1ª Semana" ou "2ª Semana"
+        ts:         string  — timestamp ISO UTC
+        tsDisplay:  string  — timestamp formatado pt-BR
+        motivo:     string  — preenchido em "Fora de Oficina"
+      }
+
+  Nomes de instrutores e unidades são fictícios nesta versão.
+  ============================================================
+-->
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<meta name="apple-mobile-web-app-title" content="FOs Campo"/>
+<title>FOs — Campo Básico Unidade Militar</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:#0a0e14;color:#c9d1d9;font-family:'Courier New',monospace;min-height:100vh;}
+header{background:#0d1117;border-bottom:1px solid #1e3a1e;padding:12px 16px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;position:sticky;top:0;z-index:100;}
+.hbadge{background:#1a3a1a;color:#4ade80;border:1px solid #4ade80;padding:2px 8px;font-size:11px;letter-spacing:2px;font-weight:bold;}
+.htitle{font-size:12px;letter-spacing:2px;color:#8b9aa8;font-weight:bold;}
+.hstats{display:flex;gap:6px;flex-wrap:wrap;}
+.pill{padding:3px 10px;font-size:11px;letter-spacing:1px;border:1px solid #2a3a4a;font-weight:bold;}
+nav{background:#0d1117;border-bottom:1px solid #1a2a1a;display:flex;}
+nav button{background:none;border:none;border-right:1px solid #1a2a3a;color:#5a6a7a;padding:10px 0;cursor:pointer;font-size:11px;letter-spacing:1px;font-family:'Courier New',monospace;flex:1;}
+nav button.active{border-bottom:2px solid #4ade80;color:#4ade80;font-weight:bold;}
+main{padding:14px;max-width:700px;margin:0 auto;}
+.flash{padding:10px 14px;margin-bottom:12px;border:1px solid;font-size:12px;letter-spacing:1px;}
+.card{background:#0d1117;border:1px solid #1e2e1e;padding:16px;margin-bottom:14px;}
+.card-title{font-size:10px;letter-spacing:3px;color:#4ade80;border-bottom:1px solid #1e2e1e;padding-bottom:8px;margin-bottom:14px;font-weight:bold;}
+.form-grid{display:flex;flex-direction:column;gap:14px;}
+.form-group{display:flex;flex-direction:column;gap:6px;}
+label{font-size:10px;letter-spacing:3px;color:#5a7a5a;}
+.radio-row{display:flex;flex-wrap:wrap;gap:6px;}
+.rbtn{background:#0a0e14;border:1px solid #2a3a2a;color:#5a7a5a;padding:6px 11px;cursor:pointer;font-size:11px;letter-spacing:1px;font-family:'Courier New',monospace;}
+.rbtn.active{background:#0f2a0f;border-color:#4ade80;color:#4ade80;font-weight:bold;}
+.rbtn.pos.active{background:#14532d;border-color:#4ade80;color:#4ade80;}
+.rbtn.neg.active{background:#7f1d1d;border-color:#f87171;color:#f87171;}
+select,input{background:#0a0e14;border:1px solid #2a3a2a;color:#c9d1d9;padding:8px 12px;font-size:12px;font-family:'Courier New',monospace;width:100%;}
+input{font-size:13px;letter-spacing:2px;}
+.instr-box{display:flex;align-items:center;gap:12px;background:#0f1a0f;border:1px solid #2a4a2a;padding:10px 14px;}
+.instr-label{font-size:10px;letter-spacing:3px;color:#4a7a4a;}
+.instr-value{font-size:14px;letter-spacing:2px;color:#a8d8a8;font-weight:bold;}
+.submit-btn{margin-top:16px;background:#14532d;border:1px solid #4ade80;color:#4ade80;padding:12px;cursor:pointer;font-size:12px;letter-spacing:3px;font-family:'Courier New',monospace;font-weight:bold;width:100%;}
+.export-btn{background:#0f1a2a;border:1px solid #3a6a9a;color:#7ab8e8;padding:10px;cursor:pointer;font-size:11px;letter-spacing:2px;font-family:'Courier New',monospace;width:100%;margin-bottom:12px;}
+
+/* ---- DESTAQUES ---- */
+.dest-section{margin-bottom:14px;}
+.dest-dia-nav{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px;align-items:center;}
+.dest-dia-nav span{font-size:10px;letter-spacing:3px;color:#5a7a5a;margin-right:4px;}
+.dia-btn{background:#0a0e14;border:1px solid #2a3a2a;color:#5a7a5a;padding:5px 12px;cursor:pointer;font-size:11px;letter-spacing:1px;font-family:'Courier New',monospace;}
+.dia-btn.active{background:#0f1a2a;border-color:#60a5fa;color:#60a5fa;font-weight:bold;}
+.dest-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+.dest-card{padding:0;border:1px solid;overflow:hidden;}
+.dest-card.diurno{border-color:#4ade80;}
+.dest-card.noturno{border-color:#60a5fa;}
+.dest-card.vazio{border-color:#2a3a2a;opacity:.5;}
+.dest-header{padding:10px 14px 8px;display:flex;align-items:center;gap:8px;}
+.dest-header.diurno{background:#0f1a0a;}
+.dest-header.noturno{background:#0a0f1a;}
+.dest-header.vazio{background:#0d1117;}
+.dest-icon{font-size:18px;}
+.dest-tipo-label{font-size:9px;letter-spacing:3px;font-weight:bold;}
+.dest-tipo-label.diurno{color:#4ade80;}
+.dest-tipo-label.noturno{color:#60a5fa;}
+.dest-tipo-label.vazio{color:#3a4a3a;}
+.dest-body{padding:12px 14px;}
+.dest-nome{font-size:18px;font-weight:bold;letter-spacing:2px;color:#f0f6fc;margin-bottom:3px;}
+.dest-sub{font-size:10px;color:#5a7a6a;letter-spacing:1px;margin-bottom:10px;}
+.dest-nums{display:flex;gap:12px;margin-bottom:10px;}
+.dest-num{display:flex;flex-direction:column;align-items:center;gap:2px;}
+.dest-num-val{font-size:20px;font-weight:bold;}
+.dest-num-lbl{font-size:8px;letter-spacing:2px;color:#4a6a5a;}
+.dest-saldo{font-size:24px;font-weight:bold;}
+.dest-divider{height:1px;background:#1a2a1a;margin:10px 0;}
+.dest-honra{font-size:10px;letter-spacing:1px;font-style:italic;display:flex;align-items:center;gap:6px;}
+.dest-honra.diurno{color:#a8d8a8;}
+.dest-honra.noturno{color:#93c5fd;}
+.dest-vazio-msg{color:#2a4a3a;font-size:11px;letter-spacing:1px;padding:20px 14px;text-align:center;}
+
+/* Rank */
+.dash-tabs{display:flex;flex-wrap:wrap;gap:0;margin-bottom:14px;border-bottom:1px solid #1a2a1a;}
+.dash-tabs button{background:none;border:none;color:#5a6a7a;padding:8px 10px;cursor:pointer;font-size:10px;letter-spacing:1px;font-family:'Courier New',monospace;}
+.dash-tabs button.active{border-bottom:2px solid #4ade80;color:#4ade80;font-weight:bold;}
+.rank-header{display:grid;grid-template-columns:26px 1fr 60px 60px 36px 36px 46px;gap:3px;padding:6px 8px;background:#0f1a0f;font-size:9px;letter-spacing:2px;color:#4ade80;margin-bottom:2px;}
+.rank-row{display:grid;grid-template-columns:26px 1fr 60px 60px 36px 36px 46px;gap:3px;padding:6px 8px;align-items:center;border-bottom:1px solid #0d1410;}
+.rank-row:nth-child(even){background:#0c1310;}
+.rank-row.top1{background:#111a08;border-left:3px solid #fbbf24;}
+.rank-pos-n{font-size:10px;color:#2a4a3a;text-align:right;}
+.rank-nome{font-size:11px;letter-spacing:1px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.rank-meta{font-size:9px;color:#3a5a4a;text-align:center;}
+.rank-val{font-size:12px;font-weight:bold;text-align:center;}
+.grp-header{display:grid;grid-template-columns:26px 1fr 36px 36px 46px;gap:3px;padding:6px 8px;background:#0f1a0f;font-size:9px;letter-spacing:2px;color:#4ade80;margin-bottom:2px;}
+.grp-row{display:grid;grid-template-columns:26px 1fr 36px 36px 46px;gap:3px;padding:6px 8px;align-items:center;border-bottom:1px solid #0d1410;}
+.grp-row:nth-child(even){background:#0c1310;}
+.grp-row.top1{background:#111a08;border-left:3px solid #fbbf24;}
+
+/* Histórico */
+.fo-list{display:flex;flex-direction:column;gap:5px;}
+.fo-item{background:#0a0e14;padding:8px 10px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:5px;border-left:3px solid #2a4a3a;}
+.fo-item.pos{border-left-color:#4ade80;}
+.fo-item.neg{border-left-color:#f87171;}
+.fo-main{display:flex;align-items:center;gap:8px;flex:1;}
+.fo-tipo{font-size:14px;font-weight:bold;min-width:14px;}
+.fo-tipo.pos{color:#4ade80;}
+.fo-tipo.neg{color:#f87171;}
+.fo-nome{font-size:12px;letter-spacing:2px;font-weight:bold;color:#e2e8f0;min-width:70px;}
+.fo-meta-block{display:flex;flex-direction:column;gap:1px;}
+.fo-meta{font-size:10px;color:#4a6a5a;letter-spacing:1px;}
+.fo-instr{font-size:9px;color:#3a5a4a;font-style:italic;}
+.fo-right{display:flex;align-items:center;gap:6px;}
+.fo-ts{font-size:9px;color:#2a4a3a;}
+.del-btn{background:none;border:1px solid #3a2a2a;color:#5a3a3a;cursor:pointer;font-size:10px;padding:2px 5px;font-family:'Courier New',monospace;}
+.del-confirm{background:#7f1d1d;border:1px solid #f87171;color:#f87171;cursor:pointer;font-size:9px;padding:3px 5px;font-family:'Courier New',monospace;margin-right:3px;}
+.del-cancel{background:none;border:1px solid #3a4a3a;color:#5a7a5a;cursor:pointer;font-size:9px;padding:3px 5px;font-family:'Courier New',monospace;}
+.loading{min-height:100vh;display:flex;align-items:center;justify-content:center;font-size:16px;letter-spacing:4px;color:#4ade80;}
+.sync-dot{width:8px;height:8px;border-radius:50%;background:#4ade80;display:inline-block;margin-left:6px;}
+.sync-dot.syncing{background:#f59e0b;animation:pulse 1s infinite;}
+.sync-dot.err{background:#f87171;}
+@keyframes pulse{0%,100%{opacity:1;}50%{opacity:.3;}}
+.empty{color:#3a4a3a;font-size:12px;letter-spacing:2px;padding:20px 0;text-align:center;}
+@media(max-width:500px){
+  .dest-grid{grid-template-columns:1fr;}
+  .rank-header,.rank-row{grid-template-columns:22px 1fr 50px 50px 32px 32px 40px;font-size:9px;}
+  .dest-nome{font-size:15px;}
+}
+</style>
+</head>
+<body>
+<div id="loading" class="loading">CARREGANDO...</div>
+<div id="app" style="display:none;">
+
+<header>
+  <div style="display:flex;align-items:center;gap:10px;">
+    <span class="hbadge">Unidade Militar</span>
+    <span class="htitle">FOs — CAMPO BÁSICO</span>
+    <span class="sync-dot" id="syncDot"></span>
+  </div>
+  <div class="hstats">
+    <span class="pill" id="statPos" style="background:#1a3a1a;color:#4ade80;">▲ 0</span>
+    <span class="pill" id="statNeg" style="background:#3a1a1a;color:#f87171;">▼ 0</span>
+    <span class="pill" id="statTot" style="background:#1a2030;color:#94a3b8;">0 TOTAL</span>
+  </div>
+</header>
+
+<nav>
+  <button class="active" onclick="setView('lancar')" id="nav-lancar">⊕ LANÇAR</button>
+  <button onclick="setView('dashboard')" id="nav-dashboard">▤ PAINEL</button>
+  <button onclick="setView('historico')" id="nav-historico">≡ HISTÓRICO</button>
+</nav>
+
+<main>
+  <div id="flash" style="display:none;" class="flash"></div>
+
+  <!-- LANÇAR -->
+  <div id="view-lancar">
+    <div class="card">
+      <div class="card-title">REGISTRAR FATO OBSERVADO</div>
+      <div class="form-grid">
+        <div class="form-group">
+          <label>SEMANA</label>
+          <div class="radio-row" id="rg-semana">
+            <button class="rbtn active" onclick="setSemana('1ª Semana',this)">1ª Semana</button>
+            <button class="rbtn" onclick="setSemana('2ª Semana',this)">2ª Semana</button>
+          </div>
+        </div>
+        <div class="form-group"><label>GRUPAMENTO</label><div class="radio-row" id="rg-gpt"></div></div>
+        <div class="form-group"><label>SUBUNIDADE</label><div class="radio-row" id="rg-su"></div></div>
+        <div class="form-group">
+          <label>OFICINA</label>
+          <select id="sel-oficina" onchange="setOficina(this.value)">
+            <option value="">-- Selecione --</option>
+            <option>Marcha 8 Km</option>
+            <option>Progressão Diurna</option>
+            <option>HPPS</option>
+            <option>Técnicas Especiais</option>
+            <option>Orientação Diurna</option>
+            <option>Orientação Noturna</option>
+            <option>Progressão Noturna e Mensageiro</option>
+            <option disabled>──────────────────</option>
+            <option>Fora de Oficina</option>
+          </select>
+        </div>
+        <div class="instr-box" id="instr-box" style="display:none;">
+          <span class="instr-label">INSTRUTOR</span>
+          <span class="instr-value" id="instr-value">—</span>
+        </div>
+        <div id="instr-manual-box" style="display:none;flex-direction:column;gap:14px;">
+          <div class="form-group">
+            <label>INSTRUTOR RESPONSÁVEL</label>
+            <select id="sel-instrutor-manual" onchange="setInstrutorManual(this.value)">
+              <option value="">-- Selecione --</option>
+              <option>Asp Silva</option>
+              <option>Ten Oliveira</option>
+              <option>Ten Santos</option>
+              <option>Ten Ferreira</option>
+              <option>Ten Costa</option>
+              <option>Ten Lima</option>
+              <option>Ten Rocha</option>
+              <option>Ten Alves</option>
+              <option>Ten Moreira</option>
+              <option>Ten Barbosa</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>MOTIVO / CONTEXTO</label>
+            <input id="inp-motivo" type="text" placeholder="Ex: Refeição, Canção..." maxlength="60" oninput="state.motivo=this.value"/>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>NOME DE GUERRA DO SOLDADO</label>
+          <input id="inp-nome" type="text" placeholder="Ex: SILVA" onkeydown="if(event.key==='Enter')registrar()"/>
+        </div>
+        <div class="form-group">
+          <label>TIPO DE FO</label>
+          <div class="radio-row">
+            <button class="rbtn pos active" id="btn-pos" onclick="setTipo('POS')">▲ POSITIVO</button>
+            <button class="rbtn neg" id="btn-neg" onclick="setTipo('NEG')">▼ NEGATIVO</button>
+          </div>
+        </div>
+      </div>
+      <button class="submit-btn" onclick="registrar()">REGISTRAR FO</button>
+    </div>
+  </div>
+
+  <!-- DASHBOARD -->
+  <div id="view-dashboard" style="display:none;">
+    <button class="export-btn" onclick="exportarJSON()">⬇ EXPORTAR BACKUP (JSON)</button>
+
+    <!-- DESTAQUES COM SELETOR DE DIA -->
+    <div class="card dest-section">
+      <div class="card-title">DESTAQUES DO DIA</div>
+      <div class="dest-dia-nav">
+        <span>DIA:</span>
+        <div id="dia-btns" style="display:flex;gap:6px;flex-wrap:wrap;"></div>
+      </div>
+      <div class="dest-grid" id="dest-grid">
+        <div class="dest-card vazio"><div class="dest-vazio-msg">Selecione um dia</div></div>
+        <div class="dest-card vazio"><div class="dest-vazio-msg">Selecione um dia</div></div>
+      </div>
+    </div>
+
+    <!-- RANKING -->
+    <div style="display:flex;gap:0;margin-bottom:10px;border-bottom:1px solid #1a3a1a;">
+      <button class="active" onclick="setSemanaFiltro('todas',this)" id="sf-todas" style="background:none;border:none;color:#4ade80;padding:8px 14px;cursor:pointer;font-size:10px;letter-spacing:2px;font-family:'Courier New',monospace;border-bottom:2px solid #4ade80;font-weight:bold;">GERAL</button>
+      <button onclick="setSemanaFiltro('1ª Semana',this)" id="sf-s1" style="background:none;border:none;color:#5a6a7a;padding:8px 14px;cursor:pointer;font-size:10px;letter-spacing:2px;font-family:'Courier New',monospace;">1ª SEMANA</button>
+      <button onclick="setSemanaFiltro('2ª Semana',this)" id="sf-s2" style="background:none;border:none;color:#5a6a7a;padding:8px 14px;cursor:pointer;font-size:10px;letter-spacing:2px;font-family:'Courier New',monospace;">2ª SEMANA</button>
+    </div>
+    <div class="dash-tabs">
+      <button class="active" onclick="setDashTab('saldo',this)">SALDO</button>
+      <button onclick="setDashTab('positivos',this)">POSITIVOS</button>
+      <button onclick="setDashTab('negativos',this)">NEGATIVOS</button>
+      <button onclick="setDashTab('grupamento',this)">GRUPAMENTO</button>
+      <button onclick="setDashTab('su',this)">SU</button>
+    </div>
+    <div id="dash-content"></div>
+  </div>
+
+  <!-- HISTÓRICO -->
+  <div id="view-historico" style="display:none;">
+    <div class="card">
+      <div class="card-title" id="hist-title">HISTÓRICO DE FOs</div>
+      <div id="fo-list" class="fo-list"></div>
+    </div>
+  </div>
+</main>
+</div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-app.js";
+import { getFirestore, collection, addDoc, onSnapshot, deleteDoc, doc, query, orderBy }
+  from "https://www.gstatic.com/firebasejs/11.0.0/firebase-firestore.js";
+
+// ==========================================
+// SUBSTITUA PELAS SUAS CREDENCIAIS FIREBASE
+// Crie um projeto em console.firebase.google.com
+// ==========================================
+const firebaseConfig = {
+  apiKey: "SUA_API_KEY",
+  authDomain: "SEU_PROJETO.firebaseapp.com",
+  projectId: "SEU_PROJETO",
+  storageBucket: "SEU_PROJETO.firebasestorage.app",
+  messagingSenderId: "SEU_MESSAGING_SENDER_ID",
+  appId: "SEU_APP_ID"
+};
+
+const fbApp = initializeApp(firebaseConfig);
+const db = getFirestore(fbApp);
+
+let fos = [];
+let state = { semana:"1ª Semana", gpt:"", su:"", oficina:"", instrutor:"", tipo:"POS", motivo:"" };
+let deleteConfirm = null;
+let currentView = "lancar";
+let currentDashTab = "saldo";
+let semanaFiltro = "todas";
+let selectedDia = null;
+
+const NOTURNAS = new Set(["Orientação Noturna","Progressão Noturna e Mensageiro"]);
+
+const GPT_SU = {
+  ALFA:["1ª Cia","2ª Cia","Cia Eng"],BRAVO:["1ª Cia","2ª Cia","Cia Eng"],
+  CHARLIE:["1ª Cia","2ª Cia","Cia Eng"],DELTA:["1ª Cia","2ª Cia","Cia Eng"],
+  ECHO:["3ª Cia","CCAp"],FOXTROT:["3ª Cia","CCAp"],GOLF:["3ª Cia","CCAp"],HOTEL:["3ª Cia","CCAp"],
+};
+const SEMANA_GPT = {
+  "1ª Semana":["ALFA","BRAVO","CHARLIE","DELTA"],
+  "2ª Semana":["ECHO","FOXTROT","GOLF","HOTEL"]
+};
+const INSTRUTORES = {
+  "Marcha 8 Km":{"1ª Semana":"Asp Silva","2ª Semana":"Asp Silva"},
+  "Progressão Diurna":{"1ª Semana":"Ten Oliveira","2ª Semana":"Ten Santos"},
+  "HPPS":{"1ª Semana":"Asp Silva","2ª Semana":"Asp Silva"},
+  "Técnicas Especiais":{"1ª Semana":"Ten Ferreira","2ª Semana":"Ten Costa"},
+  "Orientação Diurna":{"1ª Semana":"Ten Lima","2ª Semana":"Ten Rocha"},
+  "Orientação Noturna":{"1ª Semana":"Ten Alves","2ª Semana":"Ten Moreira"},
+  "Progressão Noturna e Mensageiro":{"1ª Semana":"Ten Barbosa","2ª Semana":"Ten Barbosa"},
+
+};
+
+// Converte timestamp ISO para data no fuso BRT (UTC-3)
+function getDateBRT(ts) {
+  if(!ts) return "?";
+  // Subtrai 3h do UTC para obter BRT
+  const d = new Date(new Date(ts).getTime() - 3*3600*1000);
+  return d.toISOString().slice(8,10)+"/"+d.toISOString().slice(5,7)+"/"+d.toISOString().slice(0,4);
+}
+
+// Listener Firestore
+const q = query(collection(db,"fos"), orderBy("ts","desc"));
+onSnapshot(q, (snap) => {
+  fos = snap.docs.map(d => ({ id:d.id, ...d.data() }));
+  setSyncStatus("ok");
+  updateStats();
+  if(currentView==="dashboard"){ renderDestaques(); renderDash(); }
+  if(currentView==="historico") renderHistorico();
+  document.getElementById("loading").style.display="none";
+  document.getElementById("app").style.display="block";
+}, () => {
+  setSyncStatus("err");
+  document.getElementById("loading").style.display="none";
+  document.getElementById("app").style.display="block";
+});
+
+function setSyncStatus(s){
+  document.getElementById("syncDot").className="sync-dot"+(s==="syncing"?" syncing":s==="err"?" err":"");
+}
+
+// ---- Navegação ----
+window.setView = (v) => {
+  currentView=v;
+  ["lancar","dashboard","historico"].forEach(x=>{
+    document.getElementById("view-"+x).style.display=x===v?"block":"none";
+    document.getElementById("nav-"+x).classList.toggle("active",x===v);
+  });
+  if(v==="dashboard"){ renderDestaques(); renderDash(); }
+  if(v==="historico") renderHistorico();
+};
+
+window.setSemana = (s,btn) => {
+  state.semana=s; state.gpt=""; state.su="";
+  document.querySelectorAll("#rg-semana .rbtn").forEach(b=>b.classList.remove("active"));
+  btn.classList.add("active");
+  renderGpt(); renderSu();
+  if(state.oficina) setOficina(state.oficina);
+};
+
+window.setOficina = (o) => {
+  state.oficina=o;
+  const isMomentoLivre = o === "Fora de Oficina";
+  const instr = isMomentoLivre ? "" : (INSTRUTORES[o]?.[state.semana] ?? "");
+  state.instrutor = instr;
+  // Caixa automática de instrutor (oficinas normais)
+  const box = document.getElementById("instr-box");
+  if(o && !isMomentoLivre){ box.style.display="flex"; document.getElementById("instr-value").textContent=instr||"—"; }
+  else { box.style.display="none"; }
+  // Caixa manual de instrutor (Momento Livre)
+  const manualBox = document.getElementById("instr-manual-box");
+  manualBox.style.display = isMomentoLivre ? "flex" : "none";
+  if(!isMomentoLivre){
+    document.getElementById("sel-instrutor-manual").value="";
+    document.getElementById("inp-motivo").value="";
+    state.motivo="";
+  }
+};
+
+window.setInstrutorManual = (v) => {
+  state.instrutor = v;
+};
+
+window.setTipo = (t) => {
+  state.tipo=t;
+  document.getElementById("btn-pos").classList.toggle("active",t==="POS");
+  document.getElementById("btn-neg").classList.toggle("active",t==="NEG");
+};
+
+window.setDashTab = (tab,btn) => {
+  currentDashTab=tab;
+  document.querySelectorAll(".dash-tabs button").forEach(b=>b.classList.remove("active"));
+  btn.classList.add("active");
+  renderDash();
+};
+
+window.setSemanaFiltro = (s,btn) => {
+  semanaFiltro=s;
+  ["sf-todas","sf-s1","sf-s2"].forEach(id=>{
+    const el=document.getElementById(id);
+    if(!el)return;
+    el.style.color="#5a6a7a";
+    el.style.borderBottom="none";
+    el.style.fontWeight="normal";
+  });
+  btn.style.color="#4ade80";
+  btn.style.borderBottom="2px solid #4ade80";
+  btn.style.fontWeight="bold";
+  renderDestaques();
+  renderDash();
+};
+
+function renderGpt(){
+  const row=document.getElementById("rg-gpt"); row.innerHTML="";
+  SEMANA_GPT[state.semana].forEach(g=>{
+    const b=document.createElement("button");
+    b.className="rbtn"+(state.gpt===g?" active":"");
+    b.textContent=g;
+    b.onclick=()=>{state.gpt=g;state.su="";renderGpt();renderSu();};
+    row.appendChild(b);
+  });
+}
+function renderSu(){
+  const row=document.getElementById("rg-su"); row.innerHTML="";
+  (state.gpt?GPT_SU[state.gpt]:[]).forEach(s=>{
+    const b=document.createElement("button");
+    b.className="rbtn"+(state.su===s?" active":"");
+    b.textContent=s;
+    b.onclick=()=>{state.su=s;renderSu();};
+    row.appendChild(b);
+  });
+}
+
+// ---- Registrar ----
+window.registrar = async () => {
+  const nome=document.getElementById("inp-nome").value.trim().toUpperCase();
+  const isFO = state.oficina === "Fora de Oficina";
+  if(!nome||!state.gpt||!state.su||!state.oficina){ showFlash("Preencha todos os campos.","err"); return; }
+  if(isFO && !state.instrutor){ showFlash("Selecione o instrutor responsável.","err"); return; }
+  if(isFO && !state.motivo.trim()){ showFlash("Informe o motivo do FO.","err"); return; }
+  setSyncStatus("syncing");
+  try {
+    await addDoc(collection(db,"fos"),{
+      nome, grupamento:state.gpt, su:state.su, oficina:state.oficina,
+      instrutor:state.instrutor, tipo:state.tipo, semana:state.semana,
+      ts:new Date().toISOString(), tsDisplay:new Date().toLocaleString("pt-BR"),
+      motivo: state.motivo.trim() || "",
+    });
+    document.getElementById("inp-nome").value="";
+    showFlash(`FO ${state.tipo==="POS"?"positivo":"negativo"} registrado para ${nome}.`,"ok");
+  } catch(e){ setSyncStatus("err"); showFlash("Erro ao salvar.","err"); }
+};
+
+// ---- Aggregations ----
+function rankSoldados(lista, sortBy="saldo") {
+  const r={};
+  for(const f of lista){
+    if(!r[f.nome])r[f.nome]={pos:0,neg:0,su:f.su||"",gpt:f.grupamento||""};
+    if(f.tipo==="POS")r[f.nome].pos++; else r[f.nome].neg++;
+  }
+  const arr=Object.entries(r).map(([nome,v])=>({nome,...v,saldo:v.pos-v.neg}));
+  if(sortBy==="saldo") arr.sort((a,b)=>b.saldo-a.saldo||b.pos-a.pos);
+  else if(sortBy==="pos") arr.sort((a,b)=>b.pos-a.pos||b.saldo-a.saldo);
+  else arr.sort((a,b)=>b.neg-a.neg||a.saldo-b.saldo);
+  return arr;
+}
+
+function countByKey(lista,key){
+  const r={};
+  for(const f of lista){
+    const k=f[key]||"—";
+    if(!r[k])r[k]={pos:0,neg:0};
+    if(f.tipo==="POS")r[k].pos++; else r[k].neg++;
+  }
+  return Object.entries(r).map(([k,v])=>({label:k,...v,saldo:v.pos-v.neg}))
+    .sort((a,b)=>b.saldo-a.saldo||b.pos-a.pos);
+}
+
+// Cruzamento: instrução noturna E lançada em horário noturno (ou apenas instrução noturna)
+// Regra: usa SOMENTE o tipo de oficina, independente do horário
+function isNoturna(fo){ return NOTURNAS.has(fo.oficina); }
+
+function destaqueDia(lista, noturna){
+  const sub=lista.filter(f=>isNoturna(f)===noturna);
+  if(!sub.length) return null;
+  const r={};
+  for(const f of sub){
+    if(!r[f.nome])r[f.nome]={pos:0,neg:0,su:f.su||"",gpt:f.grupamento||""};
+    if(f.tipo==="POS")r[f.nome].pos++; else r[f.nome].neg++;
+  }
+  const [nome,v]=Object.entries(r)
+    .sort((a,b)=>(b[1].pos-b[1].neg)-(a[1].pos-a[1].neg)||b[1].pos-a[1].pos)[0];
+  return{nome,...v,saldo:v.pos-v.neg};
+}
+
+function getDias(){
+  const set=new Set();
+  fos.forEach(f=>{ const d=getDateBRT(f.ts); if(d!=="?")set.add(d); });
+  return [...set].sort((a,b)=>{
+    const [da,ma,ya]=a.split('/').map(Number);
+    const [db,mb,yb]=b.split('/').map(Number);
+    return new Date(ya,ma-1,da)-new Date(yb,mb-1,db);
+  });
+}
+
+// ---- Render Destaques ----
+function renderDestaques(){
+  const dias=getDias();
+  if(!dias.length){ document.getElementById("dia-btns").innerHTML=""; return; }
+
+  // Botões de dia
+  const nav=document.getElementById("dia-btns");
+  nav.innerHTML="";
+  // Seleciona o dia mais recente por padrão se nenhum selecionado
+  if(!selectedDia || !dias.includes(selectedDia)) selectedDia=dias[dias.length-1];
+
+  dias.forEach(d=>{
+    const b=document.createElement("button");
+    b.className="dia-btn"+(d===selectedDia?" active":"");
+    b.textContent=d;
+    b.onclick=()=>{ selectedDia=d; renderDestaques(); };
+    nav.appendChild(b);
+  });
+
+  // Destaques do dia selecionado
+  const diaFos=getFosFiltrados().filter(f=>getDateBRT(f.ts)===selectedDia);
+  const destD=destaqueDia(diaFos,false);
+  const destN=destaqueDia(diaFos,true);
+
+  document.getElementById("dest-grid").innerHTML=
+    destCardHTML(destD,"diurno") + destCardHTML(destN,"noturno");
+}
+
+function destCardHTML(dest, tipo){
+  const isDiurno=tipo==="diurno";
+  const icon=isDiurno?"☀":"☾";
+  const label=isDiurno?"DESTAQUE DIURNO":"DESTAQUE NOTURNO";
+  const honra=isDiurno?"Arriará a Bandeira ao final do dia":"Hasteará a Bandeira no dia seguinte";
+  const cor=isDiurno?"#4ade80":"#60a5fa";
+
+  if(!dest){
+    return `<div class="dest-card vazio">
+      <div class="dest-header vazio">
+        <span class="dest-icon" style="opacity:.3">${icon}</span>
+        <span class="dest-tipo-label vazio">${label}</span>
+      </div>
+      <div class="dest-vazio-msg">Sem instruções ${isDiurno?"diurnas":"noturnas"} neste dia</div>
+    </div>`;
+  }
+
+  const s=(dest.saldo>=0?"+":"")+dest.saldo;
+  const sc=dest.saldo>=0?"#4ade80":"#f87171";
+
+  return `<div class="dest-card ${tipo}">
+    <div class="dest-header ${tipo}">
+      <span class="dest-icon">${icon}</span>
+      <span class="dest-tipo-label ${tipo}">${label}</span>
+    </div>
+    <div class="dest-body">
+      <div class="dest-nome">${dest.nome}</div>
+      <div class="dest-sub">${dest.gpt} · ${dest.su}</div>
+      <div class="dest-nums">
+        <div class="dest-num">
+          <span class="dest-num-val" style="color:#4ade80">▲${dest.pos}</span>
+          <span class="dest-num-lbl">POS</span>
+        </div>
+        <div class="dest-num">
+          <span class="dest-num-val" style="color:#f87171">▼${dest.neg}</span>
+          <span class="dest-num-lbl">NEG</span>
+        </div>
+        <div class="dest-num">
+          <span class="dest-saldo" style="color:${sc}">${s}</span>
+          <span class="dest-num-lbl">SALDO</span>
+        </div>
+      </div>
+      <div class="dest-divider"></div>
+      <div class="dest-honra ${tipo}">★ ${honra}</div>
+    </div>
+  </div>`;
+}
+
+// ---- Render Dash Ranking ----
+function rankTableHTML(arr){
+  if(!arr.length) return '<div class="empty">Sem dados.</div>';
+  let h=`<div class="rank-header">
+    <span>#</span><span>SOLDADO</span>
+    <span style="text-align:center">GPT</span><span style="text-align:center">SU</span>
+    <span style="text-align:center">POS</span><span style="text-align:center">NEG</span>
+    <span style="text-align:center">SALDO</span>
+  </div>`;
+  arr.forEach((s,i)=>{
+    const sc=s.saldo>=0?"#4ade80":"#f87171";
+    h+=`<div class="rank-row${i===0?" top1":""}">
+      <span class="rank-pos-n">${i+1}</span>
+      <span class="rank-nome">${s.nome}</span>
+      <span class="rank-meta">${s.gpt}</span>
+      <span class="rank-meta">${s.su}</span>
+      <span class="rank-val" style="color:#4ade80">${s.pos}</span>
+      <span class="rank-val" style="color:#f87171">${s.neg}</span>
+      <span class="rank-val" style="color:${sc}">${s.saldo>=0?"+":""}${s.saldo}</span>
+    </div>`;
+  });
+  return h;
+}
+
+function grpTableHTML(arr){
+  if(!arr.length) return '<div class="empty">Sem dados.</div>';
+  let h=`<div class="grp-header">
+    <span>#</span><span>NOME</span>
+    <span style="text-align:center">POS</span><span style="text-align:center">NEG</span>
+    <span style="text-align:center">SALDO</span>
+  </div>`;
+  arr.forEach((d,i)=>{
+    const sc=d.saldo>=0?"#4ade80":"#f87171";
+    h+=`<div class="grp-row${i===0?" top1":""}">
+      <span class="rank-pos-n">${i+1}</span>
+      <span class="rank-nome">${d.label}</span>
+      <span class="rank-val" style="color:#4ade80">${d.pos}</span>
+      <span class="rank-val" style="color:#f87171">${d.neg}</span>
+      <span class="rank-val" style="color:${sc}">${d.saldo>=0?"+":""}${d.saldo}</span>
+    </div>`;
+  });
+  return h;
+}
+
+function getFosFiltrados(){ return semanaFiltro==="todas" ? fos : fos.filter(f=>f.semana===semanaFiltro); }
+
+function renderDash(){
+  const el=document.getElementById("dash-content");
+  const fosFilt=getFosFiltrados();
+  const semLabel = semanaFiltro==="todas" ? "GERAL" : semanaFiltro.toUpperCase();
+  if(currentDashTab==="grupamento"){
+    el.innerHTML=`<div class="card"><div class="card-title">RANKING POR GRUPAMENTO — ${semLabel}</div>${grpTableHTML(countByKey(fosFilt,"grupamento"))}</div>`;
+  } else if(currentDashTab==="su"){
+    el.innerHTML=`<div class="card"><div class="card-title">RANKING POR SUBUNIDADE — ${semLabel}</div>${grpTableHTML(countByKey(fosFilt,"su"))}</div>`;
+  } else {
+    const sortMap={saldo:"saldo",positivos:"pos",negativos:"neg"};
+    const labels={saldo:"SALDO (POS − NEG)",positivos:"MAIS POSITIVOS",negativos:"MAIS NEGATIVOS"};
+    el.innerHTML=`<div class="card"><div class="card-title">RANKING — ${labels[currentDashTab]} — ${semLabel}</div>${rankTableHTML(rankSoldados(fosFilt,sortMap[currentDashTab]))}</div>`;
+  }
+}
+
+// ---- Histórico ----
+function renderHistorico(){
+  document.getElementById("hist-title").textContent=`HISTÓRICO — ${fos.length} FOs`;
+  const el=document.getElementById("fo-list");
+  if(!fos.length){ el.innerHTML='<div class="empty">Nenhum FO registrado.</div>'; return; }
+  el.innerHTML=fos.map(fo=>`
+    <div class="fo-item ${fo.tipo==="POS"?"pos":"neg"}">
+      <div class="fo-main">
+        <span class="fo-tipo ${fo.tipo==="POS"?"pos":"neg"}">${fo.tipo==="POS"?"▲":"▼"}</span>
+        <span class="fo-nome">${fo.nome}</span>
+        <div class="fo-meta-block">
+          <span class="fo-meta">${fo.grupamento}·${fo.su}·${fo.oficina}</span>
+          ${fo.motivo?`<span class="fo-instr" style="color:#7ab8e8">${fo.motivo}</span>`:""}
+          ${fo.instrutor?`<span class="fo-instr">${fo.instrutor}</span>`:""}
+        </div>
+      </div>
+      <div class="fo-right">
+        <span class="fo-ts">${fo.tsDisplay||""}</span>
+        ${deleteConfirm===fo.id
+          ?`<button class="del-confirm" onclick="confirmDel('${fo.id}')">OK</button><button class="del-cancel" onclick="cancelDel()">NÃO</button>`
+          :`<button class="del-btn" onclick="askDel('${fo.id}')">✕</button>`}
+      </div>
+    </div>`).join("");
+}
+
+window.askDel=(id)=>{deleteConfirm=id;renderHistorico();};
+window.cancelDel=()=>{deleteConfirm=null;renderHistorico();};
+window.confirmDel=async(id)=>{
+  try{ await deleteDoc(doc(db,"fos",id)); deleteConfirm=null; }
+  catch(e){ showFlash("Erro ao deletar.","err"); }
+};
+
+function updateStats(){
+  const pos=fos.filter(f=>f.tipo==="POS").length;
+  const neg=fos.filter(f=>f.tipo==="NEG").length;
+  document.getElementById("statPos").textContent=`▲ ${pos}`;
+  document.getElementById("statNeg").textContent=`▼ ${neg}`;
+  document.getElementById("statTot").textContent=`${fos.length} TOTAL`;
+}
+
+function showFlash(msg,type){
+  const el=document.getElementById("flash");
+  el.textContent=msg; el.style.display="block";
+  el.style.background=type==="ok"?"#14532d":"#7f1d1d";
+  el.style.borderColor=type==="ok"?"#4ade80":"#f87171";
+  setTimeout(()=>{ el.style.display="none"; },3000);
+}
+
+window.exportarJSON=()=>{
+  const blob=new Blob([JSON.stringify(fos,null,2)],{type:"application/json"});
+  const a=document.createElement("a"); a.href=URL.createObjectURL(blob);
+  a.download=`fo-campo-basico-${new Date().toISOString().slice(0,10)}.json`; a.click();
+};
+
+renderGpt(); renderSu();
+</script>
+</body>
+</html>
